@@ -8,27 +8,32 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted]
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
 
       - name: Run SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
-        with:
-          args: >
-            -Dsonar.projectKey=swiggy
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      # Uncomment the following lines if you want to fail the job if the Quality Gate fails
-      # - name: Check Quality Gate
-      #   uses: sonarsource/sonarqube-quality-gate-action@master
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      - name: NPM Install
+        run: npm install
+
+      - name: Docker build and push
+        env:
+          DOCKER_CLI_ACI: 1
+        run: |
+          # Build Docker image
+          docker build -t swiggy-clone .
+          # Tag Docker image
+          docker tag swiggy-clone deena9865/swiggy-clone:latest
+          # Log in to Docker Hub
+          echo "${{ secrets.Dockerhub_token }}" | docker login -u "${{ secrets.Dockerhub_username }}" --password-stdin
+          # Push Docker image
+          docker push deena9865/swiggy-clone:latest
+
