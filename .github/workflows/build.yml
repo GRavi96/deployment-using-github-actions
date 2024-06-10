@@ -1,48 +1,22 @@
-name: Build
-
-on:
-  push:
-    branches:
-      - master
-
-jobs:
-  build:
-    name: Build
+deploy:
+    needs: build
     runs-on: [self-hosted]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0  # Shallow clones should be disabled for better analysis
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '14'  # Specify the version of Node.js you need
-
-      - name: Install npm dependencies
-        run: npm install
-
-      - name: Run SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@master
-        with:
-          args: >
-            -Dsonar.projectKey=swiggy
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      - name: Docker build and push
-        env:
-          DOCKER_CLI_ACI: 1
+      - name: Pull Docker image
+        run: docker pull deena9865/swiggy-clone:latest
+        
+      - name: Install Trivy
         run: |
-          # Build Docker image
-          docker build -t swiggy-clone .
-          # Tag Docker image
-          docker tag swiggy-clone deena9865/swiggy-clone:latest
-          # Log in to Docker Hub
-          echo "${{ secrets.Dockerhub_token }}" | docker login -u "${{ secrets.Dockerhub_username }}" --password-stdin
-          # Push Docker image
-          docker push deena9865/swiggy-clone:latest
+          wget https://github.com/aquasecurity/trivy/releases/download/v0.29.2/trivy_0.29.2_Linux-64bit.deb
+          sudo dpkg -i trivy_0.29.2_Linux-64bit.deb
+          
+      - name: Image scan
+        run: trivy image deena9865/swiggy-clone:latest > trivyimagedeploy.txt
+        
+      - name: Deploy to container
+        run: |
+          # Stop and remove any existing container with the same name
+          docker stop swiggy-clone || true
+          docker rm swiggy-clone || true
+          # Run the new container
+          docker run -d --name swiggy-clone -p 3000:3000 deena9865/swiggy-clone:latest
