@@ -1,4 +1,53 @@
-deploy:
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: [self-hosted]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'  # Specify the version of Node.js you need
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Run SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=swiggy
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+      - name: Docker build and push
+        env:
+          DOCKER_CLI_ACI: 1
+        run: |
+          # Build Docker image
+          docker build -t swiggy-clone .
+          # Tag Docker image
+          docker tag swiggy-clone deena9865/swiggy-clone:latest
+          # Log in to Docker Hub
+          echo "${{ secrets.Dockerhub_token }}" | docker login -u "${{ secrets.Dockerhub_username }}" --password-stdin
+          # Push Docker image
+          docker push deena9865/swiggy-clone:latest
+
+  deploy:
     needs: build
     runs-on: [self-hosted]
     steps:
